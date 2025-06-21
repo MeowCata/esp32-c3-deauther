@@ -194,7 +194,7 @@ void handle_deauth_all() {
 }
 
 void handle_rescan() {
-  num_networks = WiFi.scanNetworks();
+  num_networks = WiFi.scanNetworks(false, true, true);
   redirect_root();
 }
 
