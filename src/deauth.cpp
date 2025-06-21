@@ -116,6 +116,7 @@ void start_deauth(int wifi_number, int attack_type, uint16_t reason) {
   if (deauth_type == DEAUTH_TYPE_SINGLE) {
     DEBUG_PRINT("⚠ Starting Deauth-Attack on network: ");
     DEBUG_PRINTLN(WiFi.SSID(wifi_number));
+    setRndMac();
     WiFi.softAP(AP_SSID, AP_PASS, WiFi.channel(wifi_number));
     memcpy(deauth_frame.access_point, WiFi.BSSID(wifi_number), 6);
     memcpy(deauth_frame.sender, WiFi.BSSID(wifi_number), 6);

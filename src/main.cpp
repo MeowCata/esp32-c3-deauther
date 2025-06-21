@@ -28,11 +28,14 @@ void setup() {
 #endif
 
   WiFi.mode(WIFI_MODE_AP);
-  WiFi.softAP(AP_SSID, AP_PASS, 1, true, 3); //hide SSID
+  setRndMac();
+  WiFi.softAP(AP_SSID, AP_PASS, 1, true, 2); //hide SSID
   DEBUG_PRINTF("AP started\n");
   start_web_interface();
   delay(50);
   DEBUG_PRINTF("Web service started\n");
+  DEBUG_PRINTF("AP Using MAC: ");
+  DEBUG_PRINTLN(WiFi.softAPmacAddress());
 
   pinMode(ledPin, OUTPUT);
   digitalWrite(ledPin, HIGH);       // HIGH is off
